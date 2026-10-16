@@ -1,0 +1,35 @@
+# {{ ansible_managed }}
+user www-data;
+worker_processes auto;
+pid /run/nginx.pid;
+include /etc/nginx/modules-enabled/*.conf;
+
+# Локально храним только критичные ошибки
+error_log /var/log/nginx/error.log crit;
+# Все ошибки (error и выше) - на удалённый сервер ({{ nginx_log_target }})
+error_log syslog:server={{ nginx_syslog_server }},tag=nginx_error;
+
+events {
+    worker_connections 768;
+}
+
+http {
+    sendfile on;
+    tcp_nopush on;
+    types_hash_max_size 2048;
+    server_tokens off;
+
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+
+    # Access-логи только на удалённый сервер (локально не пишутся)
+    access_log syslog:server={{ nginx_syslog_server }},tag=nginx_access,severity=info combined;
+
+    gzip on;
+
+    include /etc/nginx/conf.d/*.conf;
+    include /etc/nginx/sites-enabled/*;
+}

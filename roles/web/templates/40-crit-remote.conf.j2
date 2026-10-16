@@ -1,0 +1,6 @@
+# {{ ansible_managed }}
+# Все критичные логи (crit и выше): локально и на центральный сервер
+*.crit  /var/log/crit.log
+*.crit  action(type="omfwd" target="{{ log_server_ip }}" port="{{ rsyslog_port }}" protocol="tcp"
+               queue.type="LinkedList" queue.filename="fwd_crit"
+               queue.saveOnShutdown="on" action.resumeRetryCount="-1")

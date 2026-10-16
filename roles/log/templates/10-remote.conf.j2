@@ -1,0 +1,29 @@
+# {{ ansible_managed }}
+# Не сворачивать одинаковые сообщения ("message repeated N times"):
+# центральный сервер должен сохранять каждую запись
+$RepeatedMsgReduction off
+
+# Приём логов с удалённых хостов по TCP/UDP {{ rsyslog_port }}
+module(load="imudp")
+module(load="imtcp")
+
+template(name="RemoteLogs"  type="string" string="/var/log/rsyslog/%HOSTNAME%/%PROGRAMNAME%.log")
+template(name="RemoteAudit" type="string" string="/var/log/rsyslog/%HOSTNAME%/audit.log")
+template(name="RemoteCrit"  type="string" string="/var/log/rsyslog/%HOSTNAME%/critical.log")
+
+ruleset(name="remote") {
+    # Логи аудита (audisp-syslog, facility local6)
+    if $syslogfacility-text == "local6" then {
+        action(type="omfile" dynaFile="RemoteAudit" dirCreateMode="0755" fileCreateMode="0640")
+        stop
+    }
+    # Критичные логи (emerg, alert, crit) дополнительно в отдельный файл
+    if $syslogseverity <= 2 then {
+        action(type="omfile" dynaFile="RemoteCrit" dirCreateMode="0755" fileCreateMode="0640")
+    }
+    # Всё остальное раскладываем по имени программы (тегу)
+    action(type="omfile" dynaFile="RemoteLogs" dirCreateMode="0755" fileCreateMode="0640")
+}
+
+input(type="imudp" port="{{ rsyslog_port }}" ruleset="remote")
+input(type="imtcp" port="{{ rsyslog_port }}" ruleset="remote")

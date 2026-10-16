@@ -1,0 +1,68 @@
+---
+- name: Install packages
+  ansible.builtin.apt:
+    name: [nginx, auditd, audispd-plugins, rsyslog]
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Ensure auditd started
+  ansible.builtin.service:
+    name: auditd
+    state: started
+    enabled: true
+
+- name: Configure nginx logging
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/nginx.conf
+    mode: "0644"
+    validate: nginx -t -c %s
+  notify: restart nginx
+
+- name: Ensure nginx started
+  ansible.builtin.service:
+    name: nginx
+    state: started
+    enabled: true
+
+- name: rsyslog - forward audit logs
+  ansible.builtin.template:
+    src: 30-audit-remote.conf.j2
+    dest: /etc/rsyslog.d/30-audit-remote.conf
+    mode: "0644"
+  notify: restart rsyslog
+
+- name: rsyslog - critical logs locally and remote
+  ansible.builtin.template:
+    src: 40-crit-remote.conf.j2
+    dest: /etc/rsyslog.d/40-crit-remote.conf
+    mode: "0644"
+  notify: restart rsyslog
+
+- name: Validate rsyslog config
+  ansible.builtin.command: rsyslogd -N1
+  changed_when: false
+
+- name: Audit rules for nginx configs
+  ansible.builtin.copy:
+    src: nginx.rules
+    dest: /etc/audit/rules.d/nginx.rules
+    mode: "0640"
+  notify: load audit rules
+
+- name: Enable audisp-syslog plugin
+  ansible.builtin.copy:
+    src: audisp-syslog.conf
+    dest: /etc/audit/plugins.d/syslog.conf
+    mode: "0640"
+  notify: reload auditd
+
+- name: Kernel parameter audit=1 (audit all processes from boot)
+  ansible.builtin.copy:
+    dest: /etc/default/grub.d/99-audit.cfg
+    content: |
+      # Аудит всех процессов с момента загрузки
+      GRUB_CMDLINE_LINUX_DEFAULT="$GRUB_CMDLINE_LINUX_DEFAULT audit=1 audit_backlog_limit=8192"
+    mode: "0644"
+  notify: update grub

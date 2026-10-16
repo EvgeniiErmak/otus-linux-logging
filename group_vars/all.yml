@@ -1,0 +1,20 @@
+---
+timezone: Europe/Moscow
+
+web_ip: 192.168.88.238
+log_server_ip: 192.168.88.239
+elk_server_ip: 192.168.88.239
+
+rsyslog_port: 514
+logstash_port: 5140
+
+# rsyslog — базовое задание; elk — задание со звёздочкой
+nginx_log_target: rsyslog
+nginx_syslog_server: "{{ (elk_server_ip ~ ':' ~ logstash_port) if nginx_log_target == 'elk' else (log_server_ip ~ ':' ~ rsyslog_port) }}"
+
+elk_version: "8.19.0"
+elk_dir: /opt/elk
+
+etc_hosts:
+  - { name: web, ip: "{{ web_ip }}" }
+  - { name: log, ip: "{{ log_server_ip }}" }

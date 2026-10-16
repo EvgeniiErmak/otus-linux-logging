@@ -1,0 +1,8 @@
+---
+- name: reload apparmor rsyslog
+  ansible.builtin.command: apparmor_parser -r /etc/apparmor.d/usr.sbin.rsyslogd
+
+- name: restart rsyslog
+  ansible.builtin.service:
+    name: rsyslog
+    state: restarted

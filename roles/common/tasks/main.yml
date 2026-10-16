@@ -1,0 +1,35 @@
+---
+- name: Set hostname
+  ansible.builtin.hostname:
+    name: "{{ inventory_hostname }}"
+  notify: restart rsyslog
+
+- name: Add hosts to /etc/hosts
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '\s{{ item.name }}$'
+    line: "{{ item.ip }} {{ item.name }}"
+  loop: "{{ etc_hosts }}"
+
+- name: Install base packages
+  ansible.builtin.apt:
+    name: [chrony, rsyslog]
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Enable chrony (NTP)
+  ansible.builtin.service:
+    name: chrony
+    state: started
+    enabled: true
+
+- name: Get current timezone
+  ansible.builtin.command: timedatectl show -p Timezone --value
+  register: current_tz
+  changed_when: false
+
+- name: Set timezone
+  ansible.builtin.command: "timedatectl set-timezone {{ timezone }}"
+  when: current_tz.stdout != timezone
+  notify: restart rsyslog

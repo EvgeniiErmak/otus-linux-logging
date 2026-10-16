@@ -1,0 +1,6 @@
+# {{ ansible_managed }}
+# Логи аудита (audisp-syslog -> local6) отправляем на центральный сервер
+local6.*  action(type="omfwd" target="{{ log_server_ip }}" port="{{ rsyslog_port }}" protocol="tcp"
+                 queue.type="LinkedList" queue.filename="fwd_audit"
+                 queue.saveOnShutdown="on" action.resumeRetryCount="-1")
+& stop

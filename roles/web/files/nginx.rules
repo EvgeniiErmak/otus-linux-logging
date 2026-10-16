@@ -1,0 +1,5 @@
+## Аудит изменений конфигурации nginx
+-w /etc/nginx/nginx.conf -p wa -k nginx_conf
+-w /etc/nginx/conf.d/ -p wa -k nginx_conf
+-w /etc/nginx/sites-available/ -p wa -k nginx_conf
+-w /etc/nginx/sites-enabled/ -p wa -k nginx_conf

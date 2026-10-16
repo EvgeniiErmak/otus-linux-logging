@@ -1,0 +1,19 @@
+---
+- name: restart nginx
+  ansible.builtin.service:
+    name: nginx
+    state: restarted
+
+- name: restart rsyslog
+  ansible.builtin.service:
+    name: rsyslog
+    state: restarted
+
+- name: load audit rules
+  ansible.builtin.command: augenrules --load
+
+- name: reload auditd
+  ansible.builtin.command: pkill -HUP -x auditd
+
+- name: update grub
+  ansible.builtin.command: update-grub

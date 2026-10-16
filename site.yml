@@ -1,0 +1,21 @@
+---
+- name: Common settings (hostname, time, NTP)
+  hosts: all
+  become: true
+  roles: [common]
+
+- name: Central log server (rsyslog)
+  hosts: logservers
+  become: true
+  roles: [log]
+
+- name: ELK (nginx logs only)
+  hosts: elkservers
+  become: true
+  tags: [elk]
+  roles: [elk]
+
+- name: Web server (nginx + auditd + rsyslog client)
+  hosts: webservers
+  become: true
+  roles: [web]
