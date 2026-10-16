@@ -1,0 +1,96 @@
+---
+- name: Check docker
+  ansible.builtin.command: docker --version
+  register: docker_bin
+  changed_when: false
+  failed_when: false
+
+- name: Install docker (only if absent)
+  ansible.builtin.apt:
+    name: [docker.io, docker-compose-v2]
+    state: present
+    update_cache: true
+  when: docker_bin.rc != 0
+
+- name: Check docker compose
+  ansible.builtin.command: docker compose version
+  changed_when: false
+
+- name: vm.max_map_count for Elasticsearch
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/99-elasticsearch.conf
+    content: "vm.max_map_count=262144\n"
+    mode: "0644"
+  register: sysctl_conf
+
+- name: Apply sysctl
+  ansible.builtin.command: sysctl --system
+  when: sysctl_conf.changed
+
+- name: Create ELK directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ elk_dir }}"
+    - "{{ elk_dir }}/logstash/pipeline"
+
+- name: docker-compose.yml
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ elk_dir }}/docker-compose.yml"
+    mode: "0644"
+
+- name: Logstash pipeline
+  ansible.builtin.copy:
+    src: nginx.conf
+    dest: "{{ elk_dir }}/logstash/pipeline/nginx.conf"
+    mode: "0644"
+  register: pipeline
+
+- name: Start ELK
+  ansible.builtin.command: docker compose up -d
+  args:
+    chdir: "{{ elk_dir }}"
+  register: compose_up
+  changed_when: "'Started' in (compose_up.stdout + compose_up.stderr) or 'Created' in (compose_up.stdout + compose_up.stderr)"
+
+- name: Restart logstash if pipeline changed
+  ansible.builtin.command: docker compose restart logstash
+  args:
+    chdir: "{{ elk_dir }}"
+  when: pipeline.changed and not compose_up.changed
+
+- name: Wait for Elasticsearch
+  ansible.builtin.uri:
+    url: http://localhost:9200/_cluster/health
+    status_code: [200]
+  register: es_health
+  until: es_health.status == 200 and es_health.json.status in ['green', 'yellow']
+  retries: 60
+  delay: 10
+
+- name: Wait for Kibana
+  ansible.builtin.uri:
+    url: http://localhost:5601/api/status
+    status_code: [200, 503]
+  register: kb_status
+  until: kb_status.status == 200 and kb_status.json is defined and kb_status.json.status.overall.level == 'available'
+  retries: 60
+  delay: 10
+
+- name: Create Kibana data view nginx-*
+  ansible.builtin.uri:
+    url: http://localhost:5601/api/data_views/data_view
+    method: POST
+    headers:
+      kbn-xsrf: "true"
+    body_format: json
+    body:
+      data_view:
+        title: "nginx-*"
+        name: "nginx"
+        timeFieldName: "@timestamp"
+      override: true
+    status_code: [200]

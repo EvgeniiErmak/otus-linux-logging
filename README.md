@@ -25,7 +25,7 @@
 - [roles/common](roles/common) — hostname, /etc/hosts, часовой пояс, chrony
 - [roles/log](roles/log) — rsyslog-сервер ([10-remote.conf](roles/log/templates/10-remote.conf.j2))
 - [roles/web](roles/web) — nginx ([nginx.conf](roles/web/templates/nginx.conf.j2)), правила аудита ([nginx.rules](roles/web/files/nginx.rules)), пересылка crit и аудита, параметр ядра `audit=1`
-- [roles/elk](roles/elk) — ELK в Docker
+- [roles/elk](roles/elk) — ELK в Docker ([docker-compose.yml](roles/elk/templates/docker-compose.yml.j2), [pipeline Logstash](roles/elk/files/nginx.conf))
 - [scripts/create_repo.sh](scripts/create_repo.sh) — создание репозитория и push
 - [screenshots](screenshots) — скриншоты выполнения
 
@@ -49,3 +49,14 @@ ansible-playbook site.yml -e nginx_log_target=elk
 ## Особенности
 - На `log` отключено `$RepeatedMsgReduction`, иначе одинаковые строки access-лога сворачиваются.
 - На `web` задан параметр ядра `audit=1`: без него не аудируются процессы, запущенные до старта auditd.
+
+## Результат проверки
+**Базовое задание (rsyslog):**
+- access-логи nginx есть только на `log`, локальный `access.log` пустой;
+- ошибка 403 есть на `log` в `nginx_error.log`, локальный `error.log` пустой (там только `crit`);
+- `logger -p user.crit` пишет в `/var/log/crit.log` на web и в `critical.log` на log;
+- изменения `/etc/nginx/*` (`touch`, `cp`, `sed -i`, `rm`, перенаправления bash) фиксируются auditd с ключом `nginx_conf` и приходят в `audit.log` на log.
+
+**Задание со звёздочкой (ELK):**
+- nginx отправляет логи в Logstash (`192.168.88.239:5140/udp`), Elasticsearch хранит их в индексе `nginx-YYYY.MM.DD`, Kibana показывает их через data view `nginx`;
+- crit и аудит по-прежнему уходят только в rsyslog, в Elasticsearch их нет.
